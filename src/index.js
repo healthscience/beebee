@@ -1,3 +1,4 @@
+import { EventEmitter } from "events";
 import { getLlama, LlamaChatSession, LlamaChat } from "node-llama-cpp";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";
@@ -6,8 +7,9 @@ import { existsSync } from "fs";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-export class BeeBee {
+export class BeeBee extends EventEmitter {
   constructor(config = {}) {
+    super();
     // Handle both BeeBeeConfig instances and plain objects
     if (config.get && typeof config.get === 'function') {
       this.config = config.get();
@@ -56,9 +58,15 @@ export class BeeBee {
       });
       
       console.log("BeeBee initialized successfully!");
+      
+      // Emit ready event
+      this.emit('ready');
+      
       return true;
     } catch (error) {
       console.error("Failed to initialize BeeBee:", error);
+      // Emit error event
+      this.emit('error', error);
       throw error;
     }
   }
@@ -68,6 +76,12 @@ export class BeeBee {
       throw new Error("BeeBee not initialized. Call initialize() first.");
     }
 
+    // Prepend system prompt if it exists and not already included
+    const systemPrompt = this.config.systemPrompt || '';
+    const fullPrompt = options.includeSystemPrompt !== false && systemPrompt 
+      ? `${systemPrompt}\n\nUser: ${text}\n\nAssistant: `
+      : text;
+
     const promptOptions = {
       temperature: options.temperature || this.config.temperature,
       topP: options.topP || this.config.topP,
@@ -76,15 +90,20 @@ export class BeeBee {
     };
 
     try {
-      const response = await this.session.prompt(text, {
+      const response = await this.session.prompt(fullPrompt, {
         temperature: promptOptions.temperature,
         topP: promptOptions.topP,
         maxTokens: promptOptions.maxTokens
       });
       
+      // Emit response event
+      this.emit('response', response);
+      
       return response;
     } catch (error) {
       console.error("Error generating response:", error);
+      // Emit error event
+      this.emit('error', error);
       throw error;
     }
   }
@@ -93,6 +112,12 @@ export class BeeBee {
     if (!this.session) {
       throw new Error("BeeBee not initialized. Call initialize() first.");
     }
+
+    // Prepend system prompt if it exists and not already included
+    const systemPrompt = this.config.systemPrompt || '';
+    const fullPrompt = options.includeSystemPrompt !== false && systemPrompt 
+      ? `${systemPrompt}\n\nUser: ${text}\n\nAssistant: `
+      : text;
 
     const promptOptions = {
       temperature: options.temperature || this.config.temperature,
@@ -105,7 +130,7 @@ export class BeeBee {
       let fullResponse = "";
       
       // Use prompt with onToken callback for streaming
-      const response = await this.session.prompt(text, {
+      const response = await this.session.prompt(fullPrompt, {
         temperature: promptOptions.temperature,
         topP: promptOptions.topP,
         maxTokens: promptOptions.maxTokens,
@@ -120,6 +145,10 @@ export class BeeBee {
               String(token);
             
             fullResponse += tokenStr;
+            
+            // Emit token event
+            this.emit('token', tokenStr);
+            
             if (onToken) {
               onToken(tokenStr);
             }
@@ -127,9 +156,14 @@ export class BeeBee {
         }
       });
       
+      // Emit complete response event
+      this.emit('response', fullResponse);
+      
       return fullResponse;
     } catch (error) {
       console.error("Error generating streaming response:", error);
+      // Emit error event
+      this.emit('error', error);
       throw error;
     }
   }
@@ -173,10 +207,10 @@ export class BeeBee {
   }
 
   async dispose() {
-    if (this.context) {
+    if (this.context && typeof this.context.dispose === 'function') {
       await this.context.dispose();
     }
-    if (this.model) {
+    if (this.model && typeof this.model.dispose === 'function') {
       await this.model.dispose();
     }
     console.log("BeeBee disposed successfully");

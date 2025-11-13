@@ -57,26 +57,56 @@ const beebee = await createBeeBee({
 
 Factory function to create and initialize a BeeBee instance.
 
+### Event-Based API
+
+BeeBee extends EventEmitter and emits the following events:
+
+- **`ready`** - Emitted when BeeBee is initialized and ready to use
+- **`token`** - Emitted for each token during streaming (with the token string)
+- **`response`** - Emitted when a complete response is generated (with the full response)
+- **`error`** - Emitted when an error occurs (with the error object)
+
+```javascript
+const beebee = await createBeeBee();
+
+beebee.on('ready', () => {
+  console.log('BeeBee is ready!');
+});
+
+beebee.on('token', (token) => {
+  process.stdout.write(token);
+});
+
+beebee.on('response', (fullResponse) => {
+  console.log('Complete response:', fullResponse);
+});
+
+beebee.on('error', (error) => {
+  console.error('Error:', error);
+});
+```
+
 ### `beebee.prompt(text, options)`
 
-Generate a response for the given prompt.
+Generate a response for the given prompt. Emits `response` event when complete.
 
 ```javascript
 const response = await beebee.prompt("Your prompt here", {
   temperature: 0.8,
-  maxTokens: 512
+  maxTokens: 512,
+  includeSystemPrompt: true  // Default: true
 });
 ```
 
 ### `beebee.promptStream(text, options, onToken)`
 
-Generate a streaming response.
+Generate a streaming response. Emits `token` events during streaming and `response` event when complete.
 
 ```javascript
 await beebee.promptStream(
   "Tell me a story",
   { maxTokens: 300 },
-  (token) => process.stdout.write(token)
+  (token) => process.stdout.write(token)  // Optional callback
 );
 ```
 
@@ -101,6 +131,14 @@ node examples/streaming.js
 ```
 
 See streaming responses in action.
+
+### Event-Based Example
+
+```bash
+node examples/events.js
+```
+
+Demonstrates using BeeBee with event listeners for integration with beebee-ai.
 
 ## Model Information
 
@@ -179,6 +217,85 @@ The tests include:
 - Initialization and error handling tests
 - Token handling tests (including numeric token conversion)
 - Mocked integration tests for prompt and streaming functionality
+
+## BentoBoxDS Integration
+
+BeeBee is designed to integrate seamlessly with BentoBoxDS as an AI agent. It includes:
+
+- **System Prompt**: Pre-configured to assist with BentoBoxDS tools, HealthCues, and HOP
+- **Server Mode**: HTTP and WebSocket endpoints for real-time communication
+- **Streaming Support**: Token-by-token streaming for responsive chat UI
+
+### Starting the Server
+
+```bash
+# Install dependencies
+npm install
+
+# Start the BeeBee server
+npm run server
+
+# Or run in development mode with auto-reload
+npm run dev:server
+```
+
+The server provides:
+- HTTP endpoint: `http://localhost:3000/chat` (non-streaming)
+- HTTP SSE endpoint: `http://localhost:3000/chat/stream` (streaming)
+- WebSocket endpoint: `ws://localhost:3000` (bidirectional streaming)
+
+### Client Example
+
+```bash
+# Run the example client
+npm run client
+```
+
+### API Usage
+
+#### HTTP Request (Non-streaming)
+```javascript
+const response = await fetch('http://localhost:3000/chat', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    message: 'What is BentoBoxDS?',
+    options: { temperature: 0.7 }
+  })
+});
+const data = await response.json();
+console.log(data.response);
+```
+
+#### WebSocket (Streaming)
+```javascript
+const ws = new WebSocket('ws://localhost:3000');
+
+ws.on('message', (data) => {
+  const msg = JSON.parse(data);
+  if (msg.type === 'token') {
+    process.stdout.write(msg.token);
+  }
+});
+
+ws.send(JSON.stringify({
+  type: 'stream',
+  message: 'Tell me about HealthCues'
+}));
+```
+
+### Server Configuration
+
+```javascript
+const config = {
+  port: 3000,
+  beebee: {
+    temperature: 0.7,
+    maxTokens: 512,
+    // System prompt is pre-configured for BentoBoxDS
+  }
+};
+```
 
 ## License
 

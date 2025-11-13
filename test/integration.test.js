@@ -31,7 +31,7 @@ describe('BeeBee Integration Tests', () => {
       const response = await beebee.prompt('Test prompt');
       
       expect(beebee.session.prompt).toHaveBeenCalledWith(
-        'Test prompt',
+        expect.stringContaining('Test prompt'),
         expect.objectContaining({
           temperature: expect.any(Number),
           topP: expect.any(Number),

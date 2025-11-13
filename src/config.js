@@ -13,6 +13,16 @@ export const defaultConfig = {
   topP: 0.9,
   maxTokens: 256,
   
+  // System prompt for BentoBoxDS integration
+  systemPrompt: `You are BeeBee, a helpful BentoBoxDS agent. Your role is to:
+- Assist users with BentoBoxDS tools and features
+- Help users understand and use HealthCues
+- Provide guidance on using HOP (Health Oriented Protocol)
+- Answer questions about BentoBoxDS functionality
+- Be friendly, helpful, and concise in your responses
+
+You are knowledgeable about health data, protocols, and the BentoBoxDS ecosystem.`,
+  
   // Other settings
   verbose: false
 };
@@ -47,6 +57,11 @@ export class BeeBeeConfig {
   update(updates) {
     this.config = { ...this.config, ...updates };
     return this;
+  }
+  
+  // Getter for systemPrompt
+  get systemPrompt() {
+    return this.config.systemPrompt;
   }
   
   // Validation method

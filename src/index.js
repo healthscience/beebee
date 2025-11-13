@@ -8,15 +8,20 @@ const __dirname = dirname(__filename);
 
 export class BeeBee {
   constructor(config = {}) {
-    this.config = {
-      modelPath: config.modelPath || "/home/aboynejames/.local/share/nomic.ai/GPT4All/openhands-lm-1.5b-v0.1.i1-Q4_0.gguf",
-      contextSize: config.contextSize || 2048,
-      threads: config.threads || 4,
-      temperature: config.temperature || 0.7,
-      topP: config.topP || 0.9,
-      maxTokens: config.maxTokens || 256,
-      ...config
-    };
+    // Handle both BeeBeeConfig instances and plain objects
+    if (config.get && typeof config.get === 'function') {
+      this.config = config.get();
+    } else {
+      this.config = {
+        modelPath: config.modelPath || "/home/aboynejames/.local/share/nomic.ai/GPT4All/openhands-lm-1.5b-v0.1.i1-Q4_0.gguf",
+        contextSize: config.contextSize || 2048,
+        threads: config.threads || 4,
+        temperature: config.temperature || 0.7,
+        topP: config.topP || 0.9,
+        maxTokens: config.maxTokens || 256,
+        ...config
+      };
+    }
     
     this.llama = null;
     this.model = null;

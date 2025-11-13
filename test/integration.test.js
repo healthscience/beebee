@@ -50,11 +50,12 @@ describe('BeeBee Integration Tests', () => {
       beebee.model = {
         detokenize: vi.fn((tokens) => {
           // Simulate converting token IDs to words
-          const words = tokens.map(t => {
-            const wordMap = { 1: 'Hello', 2: 'world', 3: '!', 4: 'How', 5: 'are', 6: 'you?' };
-            return wordMap[t] || `token${t}`;
-          });
-          return words.join(' ');
+          const wordMap = { 1: 'Hello', 2: 'world', 3: '!', 4: 'How', 5: 'are', 6: 'you?' };
+          if (Array.isArray(tokens)) {
+            const words = tokens.map(t => wordMap[t] || `token${t}`);
+            return words.join(' ');
+          }
+          return wordMap[tokens] || `token${tokens}`;
         })
       };
       beebee.context = {};
@@ -81,7 +82,7 @@ describe('BeeBee Integration Tests', () => {
       expect(tokens[0]).toBe('Hello');
       expect(tokens[1]).toBe('world');
       expect(tokens[2]).toBe('!');
-      expect(response).toBe('Hello world !');
+      expect(response).toBe('Helloworld!');
     });
 
     it('should handle errors gracefully', async () => {

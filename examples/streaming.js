@@ -18,7 +18,7 @@ async function main() {
     console.log("\nStreaming response:\n");
     
     const response1 = await beebee.promptStream(
-      "Tell me a story about a robot learning to paint",
+      "How to cure aging?",
       {
         maxTokens: 300,
         temperature: 0.8

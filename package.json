@@ -6,13 +6,14 @@
   "type": "module",
   "scripts": {
     "start": "node examples/basic.js",
-    "server": "node examples/server.js",
-    "client": "node examples/client.js",
     "test": "vitest",
     "test:ui": "vitest --ui",
     "test:coverage": "vitest --coverage",
     "dev": "node --watch examples/basic.js",
-    "dev:server": "node --watch examples/server.js"
+    "example": "node examples/basic.js",
+    "example:stream": "node examples/streaming.js",
+    "example:events": "node examples/events.js",
+    "example:integration": "node examples/beebee-ai-integration.js"
   },
   "dependencies": {
     "node-llama-cpp": "^3.0.0",

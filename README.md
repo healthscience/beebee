@@ -223,78 +223,65 @@ The tests include:
 BeeBee is designed to integrate seamlessly with BentoBoxDS as an AI agent. It includes:
 
 - **System Prompt**: Pre-configured to assist with BentoBoxDS tools, HealthCues, and HOP
-- **Server Mode**: HTTP and WebSocket endpoints for real-time communication
+- **Event-Based API**: EventEmitter interface for easy integration with beebee-ai
 - **Streaming Support**: Token-by-token streaming for responsive chat UI
 
-### Starting the Server
+### System Prompt
 
-```bash
-# Install dependencies
-npm install
+BeeBee includes a built-in system prompt optimized for the BentoBoxDS health science agent. This provides context about:
 
-# Start the BeeBee server
-npm run server
+- BeeBee's role as an AI assistant
+- BentoBoxDS platform capabilities
+- HealthCues and HOP (Health Orchestration Platform) integration
+- Health science domain expertise
 
-# Or run in development mode with auto-reload
-npm run dev:server
-```
+The system prompt is automatically included in all prompts unless explicitly disabled:
 
-The server provides:
-- HTTP endpoint: `http://localhost:3000/chat` (non-streaming)
-- HTTP SSE endpoint: `http://localhost:3000/chat/stream` (streaming)
-- WebSocket endpoint: `ws://localhost:3000` (bidirectional streaming)
-
-### Client Example
-
-```bash
-# Run the example client
-npm run client
-```
-
-### API Usage
-
-#### HTTP Request (Non-streaming)
 ```javascript
-const response = await fetch('http://localhost:3000/chat', {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({
-    message: 'What is BentoBoxDS?',
-    options: { temperature: 0.7 }
-  })
-});
-const data = await response.json();
-console.log(data.response);
+// Use with system prompt (default)
+await beebee.prompt("What is HealthCues?");
+
+// Disable system prompt for specific prompts
+await beebee.prompt("Hello", { includeSystemPrompt: false });
 ```
 
-#### WebSocket (Streaming)
-```javascript
-const ws = new WebSocket('ws://localhost:3000');
+### Integration with beebee-ai Package
 
-ws.on('message', (data) => {
-  const msg = JSON.parse(data);
-  if (msg.type === 'token') {
-    process.stdout.write(msg.token);
-  }
+BeeBee's event-based API makes it easy to integrate with the beebee-ai package for BentoBoxDS communication:
+
+```javascript
+// Inside beebee-ai package
+const beebee = await createBeeBee();
+
+// Listen for events
+beebee.on('ready', () => {
+  // LLM is ready
 });
 
-ws.send(JSON.stringify({
-  type: 'stream',
-  message: 'Tell me about HealthCues'
-}));
+beebee.on('token', (token) => {
+  // Stream token to BentoBoxDS via websocket
+  websocket.send(JSON.stringify({ type: 'token', data: token }));
+});
+
+beebee.on('response', (fullResponse) => {
+  // Send complete response to BentoBoxDS
+  websocket.send(JSON.stringify({ type: 'response', data: fullResponse }));
+});
+
+// Handle prompts from BentoBoxDS
+websocket.on('message', async (message) => {
+  const { prompt } = JSON.parse(message);
+  await beebee.promptStream(prompt);
+});
 ```
 
-### Server Configuration
+See `examples/beebee-ai-integration.js` for a complete integration example.
 
-```javascript
-const config = {
-  port: 3000,
-  beebee: {
-    temperature: 0.7,
-    maxTokens: 512,
-    // System prompt is pre-configured for BentoBoxDS
-  }
-};
+### Example Usage
+
+```bash
+# Run the integration example
+node examples/beebee-ai-integration.js
 ```
 
 ## License

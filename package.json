@@ -1,7 +1,7 @@
 {
   "name": "beebee",
   "version": "0.1.0",
-  "description": "BeeBee LLM service using node-llama-cpp",
+  "description": "BeeBee TINY agent  LLM service using node-llama-cpp",
   "main": "src/index.js",
   "type": "module",
   "scripts": {
@@ -37,6 +37,6 @@
     "ai",
     "beebee"
   ],
-  "author": "",
+  "author": "@aboynejames",
   "license": "GPL-3.0"
 }

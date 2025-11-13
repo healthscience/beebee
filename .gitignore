@@ -152,6 +152,11 @@ vite.config.ts.timestamp-*
 *.swo
 *~
 
+# Test coverage
+coverage/
+.coverage/
+*.lcov
+
 # OS files
 .DS_Store
 Thumbs.db

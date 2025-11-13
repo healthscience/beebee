@@ -149,6 +149,37 @@ const beebee = await createBeeBee();
 - Node.js >= 18.0.0
 - A GGUF format model file
 
+## Testing
+
+BeeBee uses Vitest for testing. The test suite includes unit tests for configuration validation and integration tests for the LLM functionality.
+
+### Running Tests
+
+```bash
+# Run all tests
+npm test
+
+# Run tests with UI
+npm run test:ui
+
+# Run tests with coverage
+npm run test:coverage
+```
+
+### Test Structure
+
+```
+test/
+├── beebee.test.js      # Unit tests for BeeBee class and configuration
+└── integration.test.js # Integration tests with mocked LLM operations
+```
+
+The tests include:
+- Configuration validation tests
+- Initialization and error handling tests
+- Token handling tests (including numeric token conversion)
+- Mocked integration tests for prompt and streaming functionality
+
 ## License
 
 GPL-3.0

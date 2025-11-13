@@ -105,11 +105,18 @@ export class BeeBee {
         topP: promptOptions.topP,
         maxTokens: promptOptions.maxTokens,
         onToken: (tokens) => {
-          // tokens is an array of token strings
-          for (const token of tokens) {
-            fullResponse += token;
+          // tokens can be an array of token IDs (numbers) or strings
+          const tokenArray = Array.isArray(tokens) ? tokens : [tokens];
+          
+          for (const token of tokenArray) {
+            // Convert token to string if it's a number (token ID)
+            const tokenStr = typeof token === 'number' ? 
+              this.model.detokenize([token]) : 
+              String(token);
+            
+            fullResponse += tokenStr;
             if (onToken) {
-              onToken(token);
+              onToken(tokenStr);
             }
           }
         }

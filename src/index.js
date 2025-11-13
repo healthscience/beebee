@@ -1,4 +1,4 @@
-import { getLlama, LlamaChatSession } from "node-llama-cpp";
+import { getLlama, LlamaChatSession, LlamaChat } from "node-llama-cpp";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";
 import { existsSync } from "fs";
@@ -97,20 +97,23 @@ export class BeeBee {
     };
 
     try {
-      const stream = await this.session.promptStream(text, {
-        temperature: promptOptions.temperature,
-        topP: promptOptions.topP,
-        maxTokens: promptOptions.maxTokens
-      });
-
       let fullResponse = "";
       
-      for await (const chunk of stream) {
-        fullResponse += chunk;
-        if (onToken) {
-          onToken(chunk);
+      // Use prompt with onToken callback for streaming
+      const response = await this.session.prompt(text, {
+        temperature: promptOptions.temperature,
+        topP: promptOptions.topP,
+        maxTokens: promptOptions.maxTokens,
+        onToken: (tokens) => {
+          // tokens is an array of token strings
+          for (const token of tokens) {
+            fullResponse += token;
+            if (onToken) {
+              onToken(token);
+            }
+          }
         }
-      }
+      });
       
       return fullResponse;
     } catch (error) {
@@ -133,11 +136,22 @@ export class BeeBee {
 
     try {
       const sequence = this.context.getSequence();
-      const completion = await sequence.evaluate(prompt, {
+      
+      // Tokenize the prompt
+      const tokens = this.model.tokenize(prompt);
+      
+      // Insert tokens into sequence
+      sequence.insertTokens(tokens);
+      
+      // Generate completion
+      const completionTokens = await sequence.evaluate({
         temperature: completionOptions.temperature,
         topP: completionOptions.topP,
         maxTokens: completionOptions.maxTokens
       });
+      
+      // Decode tokens to text
+      const completion = this.model.detokenize(completionTokens);
       
       return completion;
     } catch (error) {

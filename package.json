@@ -1,0 +1,29 @@
+{
+  "name": "beebee",
+  "version": "0.1.0",
+  "description": "BeeBee LLM service using node-llama-cpp",
+  "main": "src/index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node examples/basic.js",
+    "test": "node --test",
+    "dev": "node --watch examples/basic.js"
+  },
+  "dependencies": {
+    "node-llama-cpp": "^3.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "keywords": [
+    "llm",
+    "llama",
+    "ai",
+    "beebee"
+  ],
+  "author": "",
+  "license": "GPL-3.0"
+}

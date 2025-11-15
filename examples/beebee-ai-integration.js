@@ -99,13 +99,13 @@ async function main() {
   console.log("\n--- Simulating BentoBoxDS prompt ---");
   await beebeeAI.handleBentoBoxMessage({
     type: 'prompt',
-    prompt: 'What is BentoBoxDS?'
+    prompt: 'What is BentoBoxDS and HOP in less than 100 words?'
   });
   
   console.log("\n--- Simulating BentoBoxDS streaming prompt ---");
   await beebeeAI.handleBentoBoxMessage({
     type: 'prompt_stream',
-    prompt: 'Tell me about HealthCues'
+    prompt: 'Tell me about HealthCues in less than 100 words'
   });
   
   // Clean up

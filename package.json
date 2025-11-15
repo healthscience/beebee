@@ -1,5 +1,5 @@
 {
-  "name": "beebee",
+  "name": "beebee-agent",
   "version": "0.1.0",
   "description": "BeeBee TINY agent  LLM service using node-llama-cpp",
   "main": "src/index.js",

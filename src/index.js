@@ -57,8 +57,6 @@ export class BeeBee extends EventEmitter {
         contextSequence: this.context.getSequence()
       });
       
-      console.log("BeeBee initialized successfully!");
-      
       // Emit ready event
       this.emit('ready');
       
@@ -213,7 +211,6 @@ export class BeeBee extends EventEmitter {
     if (this.model && typeof this.model.dispose === 'function') {
       await this.model.dispose();
     }
-    console.log("BeeBee disposed successfully");
   }
 
   // Utility method to get model info

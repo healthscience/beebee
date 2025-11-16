@@ -119,6 +119,83 @@ beebee.on('model:download:ready', (downloadInfo) => {
 
 See `examples/model-download-flow.js` for a complete demonstration.
 
+## Fine-tuning (Draft/Outline)
+
+BeeBee includes fine-tuning capabilities to customize the model for specific use cases:
+
+### Fine-tuning Methods
+
+```javascript
+// Start fine-tuning
+await beebee.startFineTuning({
+  trainingData: [
+    {
+      input: "User question",
+      output: "Expected response",
+      context: "System prompt"
+    }
+  ],
+  epochs: 3,
+  method: 'lora',  // 'lora', 'qlora', or 'full'
+  batchSize: 4,
+  learningRate: 5e-5
+});
+
+// Stop fine-tuning
+await beebee.stopFineTuning();
+
+// Check fine-tuning status
+const status = beebee.getFineTuneStatus();
+```
+
+### Fine-tuning Events
+
+- `finetune:start` - Fine-tuning process started
+- `finetune:progress` - Progress updates during training
+- `finetune:metrics` - Training metrics (loss, learning rate, etc.)
+- `finetune:complete` - Fine-tuning completed successfully
+- `finetune:error` - Error during fine-tuning
+- `finetune:stopped` - Fine-tuning manually stopped
+
+### Network Upgrades
+
+BeeBee can check for and apply model upgrades from the P2P network:
+
+```javascript
+// Check for upgrades
+const upgradeInfo = await beebee.checkNetworkUpgrade();
+if (upgradeInfo.available) {
+  console.log('New version available:', upgradeInfo.latestVersion);
+  console.log('Improvements:', upgradeInfo.improvements);
+  
+  // Apply the upgrade
+  await beebee.applyNetworkUpgrade(upgradeInfo);
+}
+```
+
+### Network Upgrade Events
+
+- `upgrade:checking` - Checking for available upgrades
+- `upgrade:available` - New model version available
+- `upgrade:downloading` - Downloading upgrade
+- `upgrade:complete` - Upgrade applied successfully
+
+### Implementation Notes
+
+The fine-tuning functionality uses a Python backend for the actual training process. The Python script (`python/finetune.py`) handles:
+
+1. Loading GGUF models or converting to compatible formats
+2. Applying LoRA/QLoRA for efficient fine-tuning
+3. Training on conversation data
+4. Saving checkpoints
+5. Converting back to GGUF format
+
+This is currently an outline/draft implementation. Full implementation would require:
+- Python dependencies: transformers, peft, datasets, torch
+- GGUF conversion tools from llama.cpp
+- Proper model format handling
+- Training infrastructure setup
+
 ## API Reference
 
 ### `createBeeBee(config)`

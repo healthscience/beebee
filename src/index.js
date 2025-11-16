@@ -5,6 +5,7 @@ import { dirname, join } from "path";
 import { existsSync } from "fs";
 import { ModelManager } from "./model-manager.js";
 import { BeeBeeConfig } from "./config.js";
+import { FineTuneManager } from "./finetune-manager.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -31,8 +32,17 @@ export class BeeBee extends EventEmitter {
     // Initialize model manager
     this.modelManager = new ModelManager(this.config.modelPath);
     
+    // Initialize fine-tune manager
+    this.fineTuneManager = new FineTuneManager({
+      modelPath: this.config.modelPath,
+      pythonPath: this.config.pythonPath || 'python3'
+    });
+    
     // Set up event listeners for model management
     this.setupModelEventListeners();
+    
+    // Set up fine-tuning event listeners
+    this.setupFineTuneEventListeners();
   }
   
   setupModelEventListeners() {
@@ -71,6 +81,46 @@ export class BeeBee extends EventEmitter {
           });
         }
       }
+    });
+  }
+  
+  setupFineTuneEventListeners() {
+    // Forward fine-tuning events from manager to BeeBee
+    this.fineTuneManager.on('finetune:start', (data) => {
+      this.emit('finetune:start', data);
+    });
+    
+    this.fineTuneManager.on('finetune:progress', (data) => {
+      this.emit('finetune:progress', data);
+    });
+    
+    this.fineTuneManager.on('finetune:complete', (data) => {
+      this.emit('finetune:complete', data);
+    });
+    
+    this.fineTuneManager.on('finetune:error', (data) => {
+      this.emit('finetune:error', data);
+    });
+    
+    this.fineTuneManager.on('finetune:stopped', (data) => {
+      this.emit('finetune:stopped', data);
+    });
+    
+    // Network upgrade events
+    this.fineTuneManager.on('upgrade:available', (data) => {
+      this.emit('upgrade:available', data);
+    });
+    
+    this.fineTuneManager.on('upgrade:checking', () => {
+      this.emit('upgrade:checking');
+    });
+    
+    this.fineTuneManager.on('upgrade:downloading', (data) => {
+      this.emit('upgrade:downloading', data);
+    });
+    
+    this.fineTuneManager.on('upgrade:complete', (data) => {
+      this.emit('upgrade:complete', data);
     });
   }
 
@@ -254,12 +304,57 @@ export class BeeBee extends EventEmitter {
     }
   }
 
+  /**
+   * Start fine-tuning the model
+   * @param {Object} options - Fine-tuning options
+   * @returns {Promise<void>}
+   */
+  async startFineTuning(options) {
+    return this.fineTuneManager.startFineTuning(options);
+  }
+  
+  /**
+   * Stop current fine-tuning process
+   * @returns {Promise<void>}
+   */
+  async stopFineTuning() {
+    return this.fineTuneManager.stopFineTuning();
+  }
+  
+  /**
+   * Check for network upgrades
+   * @returns {Promise<Object>} Upgrade information
+   */
+  async checkNetworkUpgrade() {
+    return this.fineTuneManager.checkNetworkUpgrade();
+  }
+  
+  /**
+   * Apply network upgrade
+   * @param {Object} upgradeInfo - Upgrade information
+   * @returns {Promise<void>}
+   */
+  async applyNetworkUpgrade(upgradeInfo) {
+    return this.fineTuneManager.applyNetworkUpgrade(upgradeInfo);
+  }
+  
+  /**
+   * Get fine-tuning status
+   * @returns {Object} Current status
+   */
+  getFineTuneStatus() {
+    return this.fineTuneManager.getStatus();
+  }
+
   async dispose() {
     if (this.context && typeof this.context.dispose === 'function') {
       await this.context.dispose();
     }
     if (this.model && typeof this.model.dispose === 'function') {
       await this.model.dispose();
+    }
+    if (this.fineTuneManager) {
+      this.fineTuneManager.dispose();
     }
   }
 

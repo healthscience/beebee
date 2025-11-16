@@ -14,7 +14,8 @@
     "example:stream": "node examples/streaming.js",
     "example:events": "node examples/events.js",
     "example:integration": "node examples/beebee-ai-integration.js",
-    "check-model": "node examples/check-model-path.js"
+    "check-model": "node examples/check-model-path.js",
+    "example:download": "node examples/model-download-flow.js"
   },
   "dependencies": {
     "node-llama-cpp": "^3.0.0",

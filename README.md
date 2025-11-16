@@ -79,6 +79,46 @@ const beebee = await createBeeBee({
 });
 ```
 
+## Model Management
+
+BeeBee includes automatic model detection and download support through events. When the model file is missing, BeeBee emits events that BentoBoxDS can handle to download the model from either a P2P network (Hyperdrive) or cloud backup.
+
+### Model Events
+
+**Outgoing Events (BeeBee → BentoBoxDS):**
+- `model:missing` - Emitted when model file is not found
+- `model:exists` - Emitted when model file exists  
+- `model:download:ready` - Ready to receive the model file
+- `error` - Emitted with type `model:missing` when model is not found
+
+**Incoming Events (BentoBoxDS → BeeBee):**
+- `model:check` - Request to check if model exists
+- `model:download:start` - User wants to download the model
+- `model:download:complete` - Model download has finished
+
+### Example Model Download Flow
+
+```javascript
+// BentoBoxDS handles model download when BeeBee reports missing model
+beebee.on('model:missing', (modelInfo) => {
+  console.log('Model not found:', modelInfo.path);
+  console.log('Download sources:', modelInfo.sources);
+  // Show UI to user for download choice
+});
+
+// User chooses to download
+beebee.emit('model:download:start', { source: 'cloud' });
+
+// BeeBee prepares for download
+beebee.on('model:download:ready', (downloadInfo) => {
+  // BentoBoxDS downloads file to downloadInfo.destination
+  // When complete:
+  beebee.emit('model:download:complete');
+});
+```
+
+See `examples/model-download-flow.js` for a complete demonstration.
+
 ## API Reference
 
 ### `createBeeBee(config)`

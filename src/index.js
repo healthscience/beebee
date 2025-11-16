@@ -3,6 +3,8 @@ import { getLlama, LlamaChatSession, LlamaChat } from "node-llama-cpp";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";
 import { existsSync } from "fs";
+import { ModelManager } from "./model-manager.js";
+import { BeeBeeConfig } from "./config.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -11,31 +13,79 @@ export class BeeBee extends EventEmitter {
   constructor(config = {}) {
     super();
     // Handle both BeeBeeConfig instances and plain objects
-    if (config.get && typeof config.get === 'function') {
+    if (config instanceof BeeBeeConfig) {
+      this.config = config.get();
+    } else if (config.get && typeof config.get === 'function') {
       this.config = config.get();
     } else {
-      this.config = {
-        modelPath: config.modelPath || "/home/aboynejames/.local/share/nomic.ai/GPT4All/openhands-lm-1.5b-v0.1.i1-Q4_0.gguf",
-        contextSize: config.contextSize || 2048,
-        threads: config.threads || 4,
-        temperature: config.temperature || 0.7,
-        topP: config.topP || 0.9,
-        maxTokens: config.maxTokens || 256,
-        ...config
-      };
+      // Create a BeeBeeConfig instance with the provided config
+      const beebeeConfig = new BeeBeeConfig(config);
+      this.config = beebeeConfig.get();
     }
     
     this.llama = null;
     this.model = null;
     this.context = null;
     this.session = null;
+    
+    // Initialize model manager
+    this.modelManager = new ModelManager(this.config.modelPath);
+    
+    // Set up event listeners for model management
+    this.setupModelEventListeners();
+  }
+  
+  setupModelEventListeners() {
+    // Listen for model check request from BentoBoxDS
+    this.on('model:check', () => {
+      const modelInfo = this.modelManager.getModelInfo();
+      if (modelInfo.exists) {
+        this.emit('model:exists', modelInfo);
+      } else {
+        this.emit('model:missing', modelInfo);
+      }
+    });
+    
+    // Listen for download start from BentoBoxDS
+    this.on('model:download:start', async (data) => {
+      const source = data?.source || 'hyperdrive';
+      const downloadInfo = this.modelManager.getDownloadInfo(source);
+      
+      // Ensure directory exists
+      await this.modelManager.ensureDirectory();
+      
+      // Emit ready for download
+      this.emit('model:download:ready', downloadInfo);
+    });
+    
+    // Listen for download complete from BentoBoxDS
+    this.on('model:download:complete', async () => {
+      // Re-check model and try to initialize if it exists now
+      if (this.modelManager.exists()) {
+        try {
+          await this.initialize();
+        } catch (error) {
+          this.emit('error', { 
+            type: 'initialization', 
+            message: error.message 
+          });
+        }
+      }
+    });
   }
 
   async initialize() {
     try {
       // Check if model file exists
-      if (!existsSync(this.config.modelPath)) {
-        throw new Error(`Model file not found at: ${this.config.modelPath}`);
+      if (!this.modelManager.exists()) {
+        const modelInfo = this.modelManager.getModelInfo();
+        this.emit('model:missing', modelInfo);
+        this.emit('error', {
+          type: 'model:missing',
+          message: `Model file not found at: ${this.config.modelPath}`,
+          modelInfo
+        });
+        return false;
       }
 
       // Get llama instance
@@ -230,6 +280,9 @@ export class BeeBee extends EventEmitter {
 // Export a factory function for convenience
 export async function createBeeBee(config = {}) {
   const beebee = new BeeBee(config);
-  await beebee.initialize();
+  const initialized = await beebee.initialize();
+  
+  // Return beebee instance even if model is missing
+  // BentoBoxDS can handle the model:missing event
   return beebee;
 }

@@ -13,7 +13,8 @@
     "example": "node examples/basic.js",
     "example:stream": "node examples/streaming.js",
     "example:events": "node examples/events.js",
-    "example:integration": "node examples/beebee-ai-integration.js"
+    "example:integration": "node examples/beebee-ai-integration.js",
+    "check-model": "node examples/check-model-path.js"
   },
   "dependencies": {
     "node-llama-cpp": "^3.0.0",

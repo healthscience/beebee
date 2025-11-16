@@ -20,6 +20,34 @@ BeeBee is a standalone LLM service that replaces the previous chain of `beebee-a
 npm install
 ```
 
+### Model Setup
+
+BeeBee requires a GGUF model file. By default, it looks for the model in the HOP models directory:
+
+- **Linux/Mac**: `~/.hop-models/beebee/openhands-lm-1.5b-v0.1.i1-Q4_0.gguf`
+- **Windows**: `~/hop-models/beebee/openhands-lm-1.5b-v0.1.i1-Q4_0.gguf`
+
+To set up the model:
+
+```bash
+# Create the directory (Linux/Mac)
+mkdir -p ~/.hop-models/beebee
+
+# Create the directory (Windows)
+mkdir -p ~/hop-models/beebee
+
+# Copy your model file to the directory
+cp /path/to/openhands-lm-1.5b-v0.1.i1-Q4_0.gguf ~/.hop-models/beebee/
+```
+
+You can also specify a custom model path:
+
+```javascript
+const beebee = await createBeeBee({
+  modelPath: "/custom/path/to/model.gguf"
+});
+```
+
 ## Quick Start
 
 ```javascript

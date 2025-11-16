@@ -1,10 +1,18 @@
-import { homedir } from "os";
+import { homedir, platform } from "os";
 import { join } from "path";
+
+// Determine HOP models directory based on platform
+// Linux/Mac: ~/.hop-models/beebee
+// Windows: ~/hop-models/beebee
+const hopModelsDir = platform() === 'win32' 
+  ? join(homedir(), 'hop-models', 'beebee')
+  : join(homedir(), '.hop-models', 'beebee');
 
 // Default configuration for BeeBee
 export const defaultConfig = {
   // Model settings
-  modelPath: "/home/aboynejames/.local/share/nomic.ai/GPT4All/openhands-lm-1.5b-v0.1.i1-Q4_0.gguf",
+  // Model file should be placed in the HOP models directory
+  modelPath: join(hopModelsDir, 'openhands-lm-1.5b-v0.1.i1-Q4_0.gguf'),
   contextSize: 2048,
   threads: 4,
   

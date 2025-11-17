@@ -182,7 +182,7 @@ export class BeeBee extends EventEmitter {
             this.emit('token', tokenStr, bboxID);
             
             if (onToken) {
-              onToken(tokenStr);
+              onToken(tokenStr, bboxID);
             }
           }
         }

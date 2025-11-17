@@ -27,12 +27,16 @@ export class BeeBee extends EventEmitter {
     this.model = null;
     this.context = null;
     this.session = null;
+    this.isInitialized = false;
     
     // Initialize model manager
     this.modelManager = new ModelManager(this.config.modelPath);
     
     // Set up event listeners for model management
     this.setupModelEventListeners();
+
+    // Initialize the instance
+    this.initialize();
   }
   
   setupModelEventListeners() {
@@ -93,7 +97,8 @@ export class BeeBee extends EventEmitter {
       
       // Load the model
       this.model = await this.llama.loadModel({
-        modelPath: this.config.modelPath
+        modelPath: this.config.modelPath,
+        ...this.config.modelOptions
       });
       
       // Create context
@@ -104,9 +109,12 @@ export class BeeBee extends EventEmitter {
       
       // Create chat session
       this.session = new LlamaChatSession({
-        contextSequence: this.context.getSequence()
+        contextSequence: this.context.getSequence(),
+        ...this.config.sessionOptions
       });
       
+      this.isInitialized = true;
+
       // Emit ready event
       this.emit('ready');
       
@@ -119,33 +127,21 @@ export class BeeBee extends EventEmitter {
     }
   }
 
-  async prompt(text, options = {}) {
-    if (!this.session) {
+  async prompt(text, options = {}, bboxID) {
+    if (!this.isInitialized) {
       throw new Error("BeeBee not initialized. Call initialize() first.");
     }
 
-    // Prepend system prompt if it exists and not already included
-    const systemPrompt = this.config.systemPrompt || '';
-    const fullPrompt = options.includeSystemPrompt !== false && systemPrompt 
-      ? `${systemPrompt}\n\nUser: ${text}\n\nAssistant: `
-      : text;
-
-    const promptOptions = {
-      temperature: options.temperature || this.config.temperature,
-      topP: options.topP || this.config.topP,
-      maxTokens: options.maxTokens || this.config.maxTokens,
-      ...options
-    };
-
+    const fullPrompt = this.buildPrompt(text, options, bboxID);
     try {
       const response = await this.session.prompt(fullPrompt, {
-        temperature: promptOptions.temperature,
-        topP: promptOptions.topP,
-        maxTokens: promptOptions.maxTokens
+        temperature: options.temperature || this.config.temperature,
+        topP: options.topP || this.config.topP,
+        maxTokens: options.maxTokens || this.config.maxTokens
       });
       
       // Emit response event
-      this.emit('response', response);
+      this.emit('response', response, bboxID);
       
       return response;
     } catch (error) {
@@ -156,32 +152,20 @@ export class BeeBee extends EventEmitter {
     }
   }
 
-  async promptStream(text, options = {}, onToken) {
-    if (!this.session) {
+  async promptStream(text, options = {}, onToken, bboxID) {
+    if (!this.isInitialized) {
       throw new Error("BeeBee not initialized. Call initialize() first.");
     }
 
-    // Prepend system prompt if it exists and not already included
-    const systemPrompt = this.config.systemPrompt || '';
-    const fullPrompt = options.includeSystemPrompt !== false && systemPrompt 
-      ? `${systemPrompt}\n\nUser: ${text}\n\nAssistant: `
-      : text;
-
-    const promptOptions = {
-      temperature: options.temperature || this.config.temperature,
-      topP: options.topP || this.config.topP,
-      maxTokens: options.maxTokens || this.config.maxTokens,
-      ...options
-    };
-
+    const fullPrompt = this.buildPrompt(text, options, bboxID);
     try {
       let fullResponse = "";
       
       // Use prompt with onToken callback for streaming
       const response = await this.session.prompt(fullPrompt, {
-        temperature: promptOptions.temperature,
-        topP: promptOptions.topP,
-        maxTokens: promptOptions.maxTokens,
+        temperature: options.temperature || this.config.temperature,
+        topP: options.topP || this.config.topP,
+        maxTokens: options.maxTokens || this.config.maxTokens,
         onToken: (tokens) => {
           // tokens can be an array of token IDs (numbers) or strings
           const tokenArray = Array.isArray(tokens) ? tokens : [tokens];
@@ -195,7 +179,7 @@ export class BeeBee extends EventEmitter {
             fullResponse += tokenStr;
             
             // Emit token event
-            this.emit('token', tokenStr);
+            this.emit('token', tokenStr, bboxID);
             
             if (onToken) {
               onToken(tokenStr);
@@ -205,7 +189,7 @@ export class BeeBee extends EventEmitter {
       });
       
       // Emit complete response event
-      this.emit('response', fullResponse);
+      this.emit('response', fullResponse, bboxID);
       
       return fullResponse;
     } catch (error) {
@@ -214,6 +198,21 @@ export class BeeBee extends EventEmitter {
       this.emit('error', error);
       throw error;
     }
+  }
+
+  buildPrompt(text, options, bboxID) {
+    let prompt = '';
+
+    if (options.includeSystemPrompt !== false && this.config.systemPrompt) {
+      prompt += `${this.config.systemPrompt}\n\n`;
+    }
+
+    if (bboxID) {
+      prompt += `bboxid: ${bboxID}\n`;
+    }
+
+    prompt += `User: ${text}\nAssistant: `;
+    return prompt;
   }
 
   async complete(prompt, options = {}) {
@@ -261,6 +260,7 @@ export class BeeBee extends EventEmitter {
     if (this.model && typeof this.model.dispose === 'function') {
       await this.model.dispose();
     }
+    this.isInitialized = false;
   }
 
   // Utility method to get model info
@@ -280,8 +280,7 @@ export class BeeBee extends EventEmitter {
 // Export a factory function for convenience
 export async function createBeeBee(config = {}) {
   const beebee = new BeeBee(config);
-  const initialized = await beebee.initialize();
-  
+  // Initialization is now handled in the constructor
   // Return beebee instance even if model is missing
   // BentoBoxDS can handle the model:missing event
   return beebee;

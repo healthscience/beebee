@@ -30,6 +30,10 @@ describe('System Prompt Tests', () => {
       const prompt = 'How to life a healthy life in less then 100 worlds please?';
       const bboxid = '12345';
 
+      // setup new session for this chat id
+      beebee.startNewChatSession(bboxid);
+
+
       // Listen for the 'response' event
       const responsePromise = new Promise((resolve) => {
         beebee.once('response', (response, receivedBboxID) => {

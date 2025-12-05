@@ -30,6 +30,9 @@ describe('System Prompt Tests', () => {
       const prompt = 'How to I create a HOPquery?';
       const bboxid = '67890';
 
+      // setup new session for this chat id
+      beebee.startNewChatSession(bboxid);
+
       let fullResponse = '';
       const tokensWithBboxID = [];
 

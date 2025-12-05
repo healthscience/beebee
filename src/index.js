@@ -26,7 +26,7 @@ export class BeeBee extends EventEmitter {
     this.llama = null;
     this.model = null;
     this.context = null;
-    this.session = null;
+    this.session = {};
     this.isInitialized = false;
     
     // Initialize model manager
@@ -39,6 +39,11 @@ export class BeeBee extends EventEmitter {
     this.initialize();
   }
   
+  /**
+  * 
+  * @method setupModelEventListeners
+  *
+  */
   setupModelEventListeners() {
     // Listen for model check request from BentoBoxDS
     this.on('model:check', () => {
@@ -78,6 +83,11 @@ export class BeeBee extends EventEmitter {
     });
   }
 
+  /**
+  * 
+  * @method initialize
+  *
+  */
   async initialize() {
     try {
       // Check if model file exists
@@ -91,33 +101,21 @@ export class BeeBee extends EventEmitter {
         });
         return false;
       }
-
       // Get llama instance
       this.llama = await getLlama();
-      
       // Load the model
       this.model = await this.llama.loadModel({
         modelPath: this.config.modelPath,
         ...this.config.modelOptions
       });
-      
       // Create context
       this.context = await this.model.createContext({
         contextSize: this.config.contextSize,
         threads: this.config.threads
       });
-      
-      // Create chat session
-      this.session = new LlamaChatSession({
-        contextSequence: this.context.getSequence(),
-        ...this.config.sessionOptions
-      });
-      
       this.isInitialized = true;
-
       // Emit ready event
       this.emit('ready');
-      
       return true;
     } catch (error) {
       console.error("Failed to initialize BeeBee:", error);
@@ -127,14 +125,33 @@ export class BeeBee extends EventEmitter {
     }
   }
 
+  /**
+  * 
+  * @method startNewChatSession
+  *
+  */
+  startNewChatSession(chatID) {
+    // Create chat session
+    this.session[chatID] = new LlamaChatSession({
+      contextSequence: this.context.getSequence(),
+      ...this.config.sessionOptions
+    });
+  }
+
+  /**
+  * 
+  * @method prompt
+  *
+  */
   async prompt(text, options = {}, bboxID) {
+    // is this first prompt of this chat session?
     if (!this.isInitialized) {
       throw new Error("BeeBee not initialized. Call initialize() first.");
     }
 
     const fullPrompt = this.buildPrompt(text, options, bboxID);
     try {
-      const response = await this.session.prompt(fullPrompt, {
+      const response = await this.session[bboxID].prompt(fullPrompt, {
         temperature: options.temperature || this.config.temperature,
         topP: options.topP || this.config.topP,
         maxTokens: options.maxTokens || this.config.maxTokens
@@ -152,6 +169,11 @@ export class BeeBee extends EventEmitter {
     }
   }
 
+  /**
+  * 
+  * @method promptStream
+  *
+  */
   async promptStream(text, options = {}, onToken, bboxID) {
     if (!this.isInitialized) {
       throw new Error("BeeBee not initialized. Call initialize() first.");
@@ -162,7 +184,7 @@ export class BeeBee extends EventEmitter {
       let fullResponse = "";
       
       // Use prompt with onToken callback for streaming
-      const response = await this.session.prompt(fullPrompt, {
+      const response = await this.session[bboxID].prompt(fullPrompt, {
         temperature: options.temperature || this.config.temperature,
         topP: options.topP || this.config.topP,
         maxTokens: options.maxTokens || this.config.maxTokens,
@@ -200,6 +222,11 @@ export class BeeBee extends EventEmitter {
     }
   }
 
+  /**
+  * 
+  * @method buildPrompt
+  *
+  */
   buildPrompt(text, options, bboxID) {
     let prompt = '';
 
@@ -215,6 +242,11 @@ export class BeeBee extends EventEmitter {
     return prompt;
   }
 
+  /**
+  * 
+  * @method complete
+  *
+  */
   async complete(prompt, options = {}) {
     if (!this.context) {
       throw new Error("BeeBee not initialized. Call initialize() first.");
@@ -253,6 +285,11 @@ export class BeeBee extends EventEmitter {
     }
   }
 
+  /**
+  * 
+  * @method dispose
+  *
+  */
   async dispose() {
     if (this.context && typeof this.context.dispose === 'function') {
       await this.context.dispose();
@@ -264,6 +301,11 @@ export class BeeBee extends EventEmitter {
   }
 
   // Utility method to get model info
+  /**
+  * 
+  * @method 
+  *
+  */
   getModelInfo() {
     if (!this.model) {
       return null;

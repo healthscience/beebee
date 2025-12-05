@@ -30,6 +30,9 @@ describe('System Prompt Tests', () => {
       const prompt = 'What skin care products would you recommand for a swimmer.  In the pool 3 times a week in strong cholrene.';
       const bboxid = '67890';
 
+      // setup new session for this chat id
+      beebee.startNewChatSession(bboxid);
+
       let fullResponse = '';
       const tokensWithBboxID = [];
 

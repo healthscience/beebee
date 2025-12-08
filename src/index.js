@@ -110,7 +110,7 @@ export class BeeBee extends EventEmitter {
       this.context = await this.model.createContext({
         contextSize: this.config.contextSize,
         threads: this.config.threads,
-        sequences: 2
+        sequences: 4
       });
       this.isInitialized = true;
       // Emit ready event

@@ -26,7 +26,7 @@ export class BeeBee extends EventEmitter {
     this.llama = null;
     this.model = null;
     this.chatContext = {},
-    this.context = null;
+    this.context = {};
     this.session = {};
     this.isInitialized = false;
     
@@ -133,7 +133,7 @@ export class BeeBee extends EventEmitter {
   */
   startNewChatSession(chatID) {
     // Create chat session
-    this.chatContext[chatID] = this.context.getSequence()
+    this.chatContext[chatID] = this.context[chatID].getSequence()
     this.session[chatID] = new LlamaChatSession({
       contextSequence: this.chatContext[chatID],
       ...this.config.sessionOptions

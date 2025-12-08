@@ -2,7 +2,6 @@ import { EventEmitter } from "events";
 import { getLlama, LlamaChatSession, LlamaChat } from "node-llama-cpp";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";
-import { existsSync } from "fs";
 import { ModelManager } from "./model-manager.js";
 import { BeeBeeConfig } from "./config.js";
 
@@ -26,16 +25,14 @@ export class BeeBee extends EventEmitter {
     this.llama = null;
     this.model = null;
     this.chatContext = {},
-    this.context = {};
+    this.context = null;
     this.session = {};
     this.isInitialized = false;
     
     // Initialize model manager
     this.modelManager = new ModelManager(this.config.modelPath);
-    
     // Set up event listeners for model management
     this.setupModelEventListeners();
-
     // Initialize the instance
     this.initialize();
   }
@@ -112,7 +109,8 @@ export class BeeBee extends EventEmitter {
       // Create context
       this.context = await this.model.createContext({
         contextSize: this.config.contextSize,
-        threads: this.config.threads
+        threads: this.config.threads,
+        sequences: 2
       });
       this.isInitialized = true;
       // Emit ready event
@@ -133,10 +131,9 @@ export class BeeBee extends EventEmitter {
   */
   startNewChatSession(chatID) {
     // Create chat session
-    this.chatContext[chatID] = this.context[chatID].getSequence()
+    this.chatContext[chatID] = this.context.getSequence()
     this.session[chatID] = new LlamaChatSession({
-      contextSequence: this.chatContext[chatID],
-      ...this.config.sessionOptions
+      contextSequence: this.chatContext[chatID]
     });
   }
 

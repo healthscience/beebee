@@ -92,11 +92,7 @@ export class BeeBee extends EventEmitter {
       if (!this.modelManager.exists()) {
         const modelInfo = this.modelManager.getModelInfo();
         this.emit('model:missing', modelInfo);
-        this.emit('error', {
-          type: 'model:missing',
-          message: `Model file not found at: ${this.config.modelPath}`,
-          modelInfo
-        });
+        // Don't emit error here, just return false to indicate not initialized
         return false;
       }
       // Get llama instance
@@ -133,8 +129,22 @@ export class BeeBee extends EventEmitter {
     // Create chat session
     this.chatContext[chatID] = this.context.getSequence()
     this.session[chatID] = new LlamaChatSession({
-      contextSequence: this.chatContext[chatID]
+      contextSequence: this.chatContext[chatID],
+      systemPrompt: this.config.systemPrompt || undefined
     });
+  }
+
+  /**
+  * 
+  * @method createGrammar
+  * @param {Object} schema - JSON schema object
+  * @returns {Promise<Object>} - LlamaGrammar instance
+  */
+  async createGrammar(schema) {
+    if (!this.llama) {
+      throw new Error("BeeBee not initialized. Call initialize() first.");
+    }
+    return await this.llama.createGrammarForJsonSchema(schema);
   }
 
   /**
@@ -153,7 +163,8 @@ export class BeeBee extends EventEmitter {
       const response = await this.session[bboxID].prompt(fullPrompt, {
         temperature: options.temperature || this.config.temperature,
         topP: options.topP || this.config.topP,
-        maxTokens: options.maxTokens || this.config.maxTokens
+        maxTokens: options.maxTokens || this.config.maxTokens,
+        grammar: options.grammar
       });
       
       // Emit response event
@@ -187,6 +198,7 @@ export class BeeBee extends EventEmitter {
         temperature: options.temperature || this.config.temperature,
         topP: options.topP || this.config.topP,
         maxTokens: options.maxTokens || this.config.maxTokens,
+        grammar: options.grammar,
         onToken: (tokens) => {
           // tokens can be an array of token IDs (numbers) or strings
           const tokenArray = Array.isArray(tokens) ? tokens : [tokens];
@@ -229,15 +241,11 @@ export class BeeBee extends EventEmitter {
   buildPrompt(text, options, bboxID) {
     let prompt = '';
 
-    if (options.includeSystemPrompt !== false && this.config.systemPrompt) {
-      prompt += `${this.config.systemPrompt}\n\n`;
-    }
-
     if (bboxID) {
-      prompt += `bboxid: ${bboxID}\n`;
+      prompt += `[Context: bboxid=${bboxID}]\n`;
     }
 
-    prompt += `User: ${text}\nAssistant: `;
+    prompt += text;
     return prompt;
   }
 

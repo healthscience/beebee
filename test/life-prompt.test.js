@@ -84,6 +84,9 @@ describe('Streaming Reply Functionality', () => {
         });
       });
 
+      // setup new session for this chat id
+      beebee.startNewChatSession(bboxid);
+
       const response = await beebee.promptStream(prompt, {}, onToken, bboxid);
       console.log(response);
       const { response: eventResponse, receivedBboxID } = await responsePromise;

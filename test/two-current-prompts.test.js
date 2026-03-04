@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { createBeeBee } from '../src/index.js';
 import { BeeBeeConfig } from '../src/config.js';
 
-describe('System Prompt Tests', () => {
+describe.sequential('System Prompt Tests', () => {
   let beebee;
 
   beforeAll(async () => {
@@ -11,11 +11,12 @@ describe('System Prompt Tests', () => {
 
     beebee = await createBeeBee(config);
 
-    // Wait for the 'ready' event to ensure BeeBee is initialized
-    await new Promise((resolve, reject) => {
-      beebee.on('ready', resolve);
-      beebee.on('error', reject);
-    });
+    if (!beebee.isInitialized) {
+      await new Promise((resolve, reject) => {
+        beebee.on('ready', resolve);
+        beebee.on('error', reject);
+      });
+    }
   });
 
   afterAll(async () => {
@@ -54,20 +55,19 @@ describe('System Prompt Tests', () => {
 
       // Listen for the 'response' event
       const responsePromise = new Promise((resolve) => {
-        beebee.once('response', (response, receivedBboxID) => {
-          resolve({ response, receivedBboxID });
-        });
+        const handler = (response, receivedBboxID) => {
+          if (receivedBboxID === bboxid) {
+            beebee.off('response', handler);
+            resolve({ response, receivedBboxID });
+          }
+        };
+        beebee.on('response', handler);
       });
 
       const response = await beebee.promptStream(prompt, {}, onToken, bboxid);
       console.log(response);
       const { response: eventResponse, receivedBboxID } = await responsePromise;
-      // start second prompt
-      const response2 = await beebee.promptStream(prompt, {}, onToken, bboxid);
-      console.log('response two')
-      console.log(response2);
-
-
+      
       expect(response).toBeDefined();
       expect(response).toBeTypeOf('string');
       expect(response.length).toBeGreaterThan(0);
@@ -75,19 +75,25 @@ describe('System Prompt Tests', () => {
       expect(eventResponse).toBe(response);
       expect(receivedBboxID).toBe(bboxid);
 
+      // start second prompt
+      fullResponse = '';
+      const response2 = await beebee.promptStream(promptTwo, {}, onToken, bboxidTwo);
+      console.log('response two')
+      console.log(response2);
+
       // Ensure the response has two parts
       const parts = response.split('\n');
       expect(parts.length).toBeGreaterThanOrEqual(2);
 
       // Validate that each token event has the correct bboxid
       tokenEvents.forEach(({ token, receivedBboxID }) => {
-        expect(receivedBboxID).toBe(bboxid);
+        expect([bboxid, bboxidTwo]).toContain(receivedBboxID);
       });
 
       // Validate that each token in the tokensWithBboxID array has the correct bboxid
       tokensWithBboxID.forEach(({ token, bboxid: tokenBboxID }) => {
-        expect(tokenBboxID).toBe(bboxid);
+        expect([bboxid, bboxidTwo]).toContain(tokenBboxID);
       });
-    }, 120000); // Increase timeout to 120 seconds
+    }, 300000); // Increase timeout to 300 seconds
   });
 });

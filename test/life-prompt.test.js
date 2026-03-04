@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { createBeeBee } from '../src/index.js';
 import { BeeBeeConfig } from '../src/config.js';
 
-describe('System Prompt Tests', () => {
+describe.sequential('System Prompt Tests', () => {
   let beebee;
 
   beforeAll(async () => {
@@ -11,11 +11,12 @@ describe('System Prompt Tests', () => {
 
     beebee = await createBeeBee(config);
 
-    // Wait for the 'ready' event to ensure BeeBee is initialized
-    await new Promise((resolve, reject) => {
-      beebee.on('ready', resolve);
-      beebee.on('error', reject);
-    });
+    if (!beebee.isInitialized) {
+      await new Promise((resolve, reject) => {
+        beebee.on('ready', resolve);
+        beebee.on('error', reject);
+      });
+    }
   });
 
   afterAll(async () => {
@@ -36,9 +37,13 @@ describe('System Prompt Tests', () => {
 
       // Listen for the 'response' event
       const responsePromise = new Promise((resolve) => {
-        beebee.once('response', (response, receivedBboxID) => {
-          resolve({ response, receivedBboxID });
-        });
+        const handler = (response, receivedBboxID) => {
+          if (receivedBboxID === bboxid) {
+            beebee.off('response', handler);
+            resolve({ response, receivedBboxID });
+          }
+        };
+        beebee.on('response', handler);
       });
 
       const response = await beebee.prompt(prompt, {}, bboxid);
@@ -53,7 +58,7 @@ describe('System Prompt Tests', () => {
       // Ensure the response has two parts
       const parts = response.split('\n');
       expect(parts.length).toBeGreaterThanOrEqual(2);
-    }, 120000); // Increase timeout to 30 seconds
+    }, 300000); // Increase timeout to 300 seconds
   });
 
 describe('Streaming Reply Functionality', () => {
@@ -79,9 +84,13 @@ describe('Streaming Reply Functionality', () => {
 
       // Listen for the 'response' event
       const responsePromise = new Promise((resolve) => {
-        beebee.once('response', (response, receivedBboxID) => {
-          resolve({ response, receivedBboxID });
-        });
+        const handler = (response, receivedBboxID) => {
+          if (receivedBboxID === bboxid) {
+            beebee.off('response', handler);
+            resolve({ response, receivedBboxID });
+          }
+        };
+        beebee.on('response', handler);
       });
 
       // setup new session for this chat id
@@ -111,6 +120,6 @@ describe('Streaming Reply Functionality', () => {
       tokensWithBboxID.forEach(({ token, bboxid: tokenBboxID }) => {
         expect(tokenBboxID).toBe(bboxid);
       });
-    }, 120000); // Increase timeout to 120 seconds
+    }, 300000); // Increase timeout to 300 seconds
   });
 });

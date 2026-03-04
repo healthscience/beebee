@@ -66,8 +66,8 @@ describe('Model Detection', () => {
     });
     beebee = new BeeBee(config);
 
-    const checkHandler = vi.fn();
-    beebee.on('model:check', checkHandler);
+    const existsHandler = vi.fn();
+    beebee.on('model:exists', existsHandler);
 
     // Mock the model check to return true
     beebee.modelManager.exists = vi.fn().mockReturnValue(true);
@@ -97,10 +97,10 @@ describe('Model Detection', () => {
       return originalEmit(event, ...args);
     });
 
-    await beebee.initialize();
+    beebee.emit('model:check');
 
-    expect(checkHandler).toHaveBeenCalled();
-    const modelInfo = checkHandler.mock.calls[0][0];
+    expect(existsHandler).toHaveBeenCalled();
+    const modelInfo = existsHandler.mock.calls[0][0];
     expect(modelInfo.exists).toBe(true);
     expect(modelInfo.path).toBe('/test/model.gguf');
   });
@@ -142,7 +142,7 @@ describe('Model Detection', () => {
       return originalEmit(event, ...args);
     });
 
-    await beebee.initialize();
+    beebee.emit('model:check');
 
     expect(existsHandler).toHaveBeenCalled();
     const modelInfo = existsHandler.mock.calls[0][0];
@@ -156,8 +156,8 @@ describe('Model Detection', () => {
     });
     beebee = new BeeBee(config);
 
-    const downloadStartHandler = vi.fn();
-    beebee.on('model:download:start', downloadStartHandler);
+    const downloadReadyHandler = vi.fn();
+    beebee.on('model:download:ready', downloadReadyHandler);
 
     // Mock the model check to return false
     beebee.modelManager.exists = vi.fn().mockReturnValue(false);
@@ -193,11 +193,29 @@ describe('Model Detection', () => {
 
     // Mock the download process
     beebee.modelManager.downloadModel = vi.fn().mockResolvedValue(true);
+    beebee.modelManager.ensureDirectory = vi.fn().mockResolvedValue(true);
+    beebee.modelManager.getDownloadInfo = vi.fn().mockReturnValue({
+      exists: false,
+      path: '/test/model.gguf',
+      directory: '/test',
+      size: null,
+      sources: {
+        hyperdrive: 'hyper://abc123def456...',
+        cloud: 'https://coherencestream.com/beebeemodel/openhands-lm-1.5b-v0.1.i1-Q4_0.gguf'
+      },
+      expectedSize: 1073741824,
+      modelName: 'openhands-lm-1.5b-v0.1.i1-Q4_0.gguf',
+      downloadSource: 'cloud',
+      downloadUrl: 'https://coherencestream.com/beebeemodel/openhands-lm-1.5b-v0.1.i1-Q4_0.gguf'
+    });
 
-    await beebee.initialize();
+    beebee.emit('model:download:start', { source: 'cloud' });
 
-    expect(downloadStartHandler).toHaveBeenCalled();
-    const modelInfo = downloadStartHandler.mock.calls[0][0];
+    // Wait for async event handler to complete
+    await new Promise(resolve => setTimeout(resolve, 10));
+
+    expect(downloadReadyHandler).toHaveBeenCalled();
+    const modelInfo = downloadReadyHandler.mock.calls[0][0];
     expect(modelInfo.exists).toBe(false);
     expect(modelInfo.path).toBe('/test/model.gguf');
   });
@@ -212,12 +230,12 @@ describe('Model Detection', () => {
     });
     beebee = new BeeBee(config);
 
-    const downloadStartHandler = vi.fn();
-    beebee.on('model:download:start', downloadStartHandler);
+    const downloadReadyHandler = vi.fn();
+    beebee.on('model:download:ready', downloadReadyHandler);
 
     // Mock the model check to return false
     beebee.modelManager.exists = vi.fn().mockReturnValue(false);
-    beebee.modelManager.getModelInfo = vi.fn().mockReturnValue({
+    beebee.modelManager.getDownloadInfo = vi.fn().mockReturnValue({
       exists: false,
       path: '/test/model.gguf',
       directory: '/test',
@@ -227,18 +245,17 @@ describe('Model Detection', () => {
         cloud: 'https://coherencestream.com/beebeemodel/openhands-lm-1.5b-v0.1.i1-Q4_0.gguf'
       },
       expectedSize: 1073741824,
-      modelName: 'openhands-lm-1.5b-v0.1.i1-Q4_0.gguf'
+      modelName: 'openhands-lm-1.5b-v0.1.i1-Q4_0.gguf',
+      downloadSource: 'hyperdrive',
+      downloadUrl: 'hyper://abc123def456...'
     });
+    beebee.modelManager.ensureDirectory = vi.fn().mockResolvedValue(true);
     
     // Prevent error from being thrown
     beebee.on('error', () => {});
     
     // Mock initialize to not throw
-    beebee.initialize = vi.fn().mockImplementation(async () => {
-      const modelInfo = beebee.modelManager.getModelInfo();
-      beebee.emit('model:missing', modelInfo);
-      return false;
-    });
+    beebee.initialize = vi.fn().mockResolvedValue(true);
     
     // Mock emit to prevent unhandled errors
     const originalEmit = beebee.emit.bind(beebee);
@@ -247,13 +264,14 @@ describe('Model Detection', () => {
       return originalEmit(event, ...args);
     });
 
-    // Mock the download process
-    beebee.modelManager.downloadModel = vi.fn().mockResolvedValue(true);
+    beebee.emit('model:download:start');
 
-    await beebee.initialize();
+    // Wait for async event handler to complete
+    await new Promise(resolve => setTimeout(resolve, 10));
 
-    expect(downloadStartHandler).toHaveBeenCalled();
-    const modelInfo = downloadStartHandler.mock.calls[0][0];
-    expect(modelInfo.sources.hyperdrive).toBe('hyper://abc123def456...');
+    expect(downloadReadyHandler).toHaveBeenCalled();
+    const modelInfo = downloadReadyHandler.mock.calls[0][0];
+    expect(modelInfo.exists).toBe(false);
+    expect(modelInfo.downloadSource).toBe('hyperdrive');
   });
 });

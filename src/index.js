@@ -33,8 +33,6 @@ export class BeeBee extends EventEmitter {
     this.modelManager = new ModelManager(this.config.modelPath);
     // Set up event listeners for model management
     this.setupModelEventListeners();
-    // Initialize the instance
-    this.initialize();
   }
   
   /**
@@ -87,6 +85,7 @@ export class BeeBee extends EventEmitter {
   *
   */
   async initialize() {
+    if (this.isInitialized) return true;
     try {
       // Check if model file exists
       if (!this.modelManager.exists()) {
@@ -125,12 +124,12 @@ export class BeeBee extends EventEmitter {
   * @method startNewChatSession
   *
   */
-  startNewChatSession(chatID) {
+  startNewChatSession(chatID, systemPrompt) {
     // Create chat session
     this.chatContext[chatID] = this.context.getSequence()
     this.session[chatID] = new LlamaChatSession({
       contextSequence: this.chatContext[chatID],
-      systemPrompt: this.config.systemPrompt || undefined
+      systemPrompt: systemPrompt || this.config.systemPrompt || undefined
     });
   }
 
@@ -149,6 +148,15 @@ export class BeeBee extends EventEmitter {
 
   /**
   * 
+  * @method getLlama
+  * @returns {Object} - Llama instance
+  */
+  getLlama() {
+    return this.llama;
+  }
+
+  /**
+  * 
   * @method prompt
   *
   */
@@ -158,9 +166,14 @@ export class BeeBee extends EventEmitter {
       throw new Error("BeeBee not initialized. Call initialize() first.");
     }
 
+    const sessionID = bboxID || 'default';
+    if (!this.session[sessionID]) {
+      this.startNewChatSession(sessionID);
+    }
+
     const fullPrompt = this.buildPrompt(text, options, bboxID);
     try {
-      const response = await this.session[bboxID].prompt(fullPrompt, {
+      const response = await this.session[sessionID].prompt(fullPrompt, {
         temperature: options.temperature || this.config.temperature,
         topP: options.topP || this.config.topP,
         maxTokens: options.maxTokens || this.config.maxTokens,
@@ -189,12 +202,17 @@ export class BeeBee extends EventEmitter {
       throw new Error("BeeBee not initialized. Call initialize() first.");
     }
 
+    const sessionID = bboxID || 'default';
+    if (!this.session[sessionID]) {
+      this.startNewChatSession(sessionID);
+    }
+
     const fullPrompt = this.buildPrompt(text, options, bboxID);
     try {
       let fullResponse = "";
       
       // Use prompt with onToken callback for streaming
-      const response = await this.session[bboxID].prompt(fullPrompt, {
+      const response = await this.session[sessionID].prompt(fullPrompt, {
         temperature: options.temperature || this.config.temperature,
         topP: options.topP || this.config.topP,
         maxTokens: options.maxTokens || this.config.maxTokens,
@@ -329,7 +347,8 @@ export class BeeBee extends EventEmitter {
 // Export a factory function for convenience
 export async function createBeeBee(config = {}) {
   const beebee = new BeeBee(config);
-  // Initialization is now handled in the constructor
+  // Wait for initialization to complete
+  await beebee.initialize();
   // Return beebee instance even if model is missing
   // BentoBoxDS can handle the model:missing event
   return beebee;

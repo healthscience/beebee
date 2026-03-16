@@ -208,6 +208,7 @@ export class BeeBee extends EventEmitter {
     }
 
     const fullPrompt = this.buildPrompt(text, options, bboxID);
+
     try {
       let fullResponse = "";
       

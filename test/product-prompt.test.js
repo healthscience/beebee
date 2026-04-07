@@ -1,90 +1,32 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { createBeeBee } from '../src/index.js';
 import { BeeBeeConfig } from '../src/config.js';
+import { env } from '@huggingface/transformers';
 
-describe.sequential('System Prompt Tests', () => {
+const REAL_MODEL_PATH = '/home/aboynejames/.hop-models/beebee/gemma-4-E2B-it-Q4_0.gguf';
+
+describe.sequential('System Prompt Tests - Product', () => {
   let beebee;
 
   beforeAll(async () => {
-    // Initialize BeeBee instance with a configuration
-    const config = new BeeBeeConfig();
+    env.allowRemoteModels = false;
+    const config = new BeeBeeConfig({ modelPath: REAL_MODEL_PATH });
+    beebee = await createBeeBee(config.get());
+  }, 120000);
 
-    beebee = await createBeeBee(config);
-
-    if (!beebee.isInitialized) {
-      await new Promise((resolve, reject) => {
-        beebee.on('ready', resolve);
-        beebee.on('error', reject);
-      });
-    }
-  });
-
-  afterAll(async () => {
-    // Clean up resources
-    if (beebee) {
-      await beebee.dispose();
-    }
-  });
+  afterAll(async () => {});
 
   describe('Streaming Reply Functionality', () => {
-    it('should identify a product query, suggest perplixity CMP use', async () => {
-      const prompt = 'What skin care products would you recommand for a swimmer.  In the pool 3 times a week in strong cholrene.';
-      const bboxid = '67890';
-
-      // setup new session for this chat id
-      beebee.startNewChatSession(bboxid);
-
+    it('should identify a product query and stream a response', async () => {
+      const prompt = 'What skin care products would you recommend for a swimmer?';
       let fullResponse = '';
-      const tokensWithBboxID = [];
 
-      const onToken = (token, tokenBboxID) => {
+      for await (const token of beebee.stream(prompt)) {
         fullResponse += token;
-        tokensWithBboxID.push({ token, bboxid: tokenBboxID });
-      };
-
-      // Listen for the 'token' event
-      const tokenEvents = [];
-      beebee.on('token', (token, receivedBboxID) => {
-        console.log('toekn out')
-        console.log(token)
-        tokenEvents.push({ token, receivedBboxID });
-      });
-
-      // Listen for the 'response' event
-      const responsePromise = new Promise((resolve) => {
-        const handler = (response, receivedBboxID) => {
-          if (receivedBboxID === bboxid) {
-            beebee.off('response', handler);
-            resolve({ response, receivedBboxID });
-          }
-        };
-        beebee.on('response', handler);
-      });
-
-      const response = await beebee.promptStream(prompt, {}, onToken, bboxid);
-      console.log(response);
-      const { response: eventResponse, receivedBboxID } = await responsePromise;
-
-      expect(response).toBeDefined();
-      expect(response).toBeTypeOf('string');
-      expect(response.length).toBeGreaterThan(0);
-      expect(fullResponse).toBe(response);
-      expect(eventResponse).toBe(response);
-      expect(receivedBboxID).toBe(bboxid);
-
-      // Ensure the response has two parts
-      const parts = response.split('\n');
-      expect(parts.length).toBeGreaterThanOrEqual(2);
-
-      // Validate that each token event has the correct bboxid
-      tokenEvents.forEach(({ token, receivedBboxID }) => {
-        expect(receivedBboxID).toBe(bboxid);
-      });
-
-      // Validate that each token in the tokensWithBboxID array has the correct bboxid
-      tokensWithBboxID.forEach(({ token, bboxid: tokenBboxID }) => {
-        expect(tokenBboxID).toBe(bboxid);
-      });
-    }, 300000); // Increase timeout to 300 seconds
+      }
+      console.log('Full Response:')
+      console.log(fullResponse)
+      expect(fullResponse.length).toBeGreaterThan(0);
+    }, 300000);
   });
 });

@@ -1,9 +1,9 @@
 {
   "name": "beebee-agent",
-  "version": "0.5.0",
+  "version": "0.6.0",
+  "type": "module",
   "description": "BeeBee TINY agent  LLM service using node-llama-cpp",
   "main": "src/index.js",
-  "type": "module",
   "scripts": {
     "start": "node examples/basic.js",
     "test": "vitest",
@@ -18,17 +18,7 @@
     "example:download": "node examples/model-download-flow.js"
   },
   "dependencies": {
-    "node-llama-cpp": "^3.0.0",
-    "express": "^4.18.2",
-    "ws": "^8.14.2",
-    "cors": "^2.8.5",
-    "node-fetch": "^3.3.2"
-  },
-  "devDependencies": {
-    "@types/node": "^20.0.0",
-    "vitest": "^1.0.0",
-    "@vitest/ui": "^1.0.0",
-    "@vitest/coverage-v8": "^1.0.0"
+    "@huggingface/transformers": "^4.0.1"
   },
   "engines": {
     "node": ">=18.0.0"
@@ -40,5 +30,8 @@
     "beebee"
   ],
   "author": "@aboynejames",
-  "license": "GPL-3.0"
+  "license": "GPL-3.0",
+  "devDependencies": {
+    "vitest": "^4.1.2"
+  }
 }

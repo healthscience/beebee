@@ -12,7 +12,7 @@ const hopModelsDir = platform() === 'win32'
 export const defaultConfig = {
   // Model settings
   // Model file should be placed in the HOP models directory
-  modelPath: join(hopModelsDir, 'openhands-lm-1.5b-v0.1.i1-Q4_0.gguf'),
+  modelPath: join(hopModelsDir, 'gemma-test'),
   contextSize: 2048,
   threads: 4,
   

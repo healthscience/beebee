@@ -1,125 +1,45 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { createBeeBee } from '../src/index.js';
 import { BeeBeeConfig } from '../src/config.js';
+import { CohereAsrPreTrainedModel, env } from '@huggingface/transformers';
 
-describe.sequential('System Prompt Tests', () => {
+
+describe.sequential('System Prompt Tests - Life', () => {
   let beebee;
 
   beforeAll(async () => {
-    // Initialize BeeBee instance with a configuration
+    env.allowRemoteModels = false;
     const config = new BeeBeeConfig();
+    console.log('config')
+    console.log(config.get())
+    beebee = await createBeeBee(config.get());
+  }, 120000);
 
-    beebee = await createBeeBee(config);
-
-    if (!beebee.isInitialized) {
-      await new Promise((resolve, reject) => {
-        beebee.on('ready', resolve);
-        beebee.on('error', reject);
-      });
-    }
-  });
-
-  afterAll(async () => {
-    // Clean up resources
-    if (beebee) {
-      await beebee.dispose();
-    }
-  });
+  afterAll(async () => {});
 
   describe('Reply Functionality', () => {
-    it('should return a reply for a given prompt and bboxid', async () => {
-      const prompt = 'How to life a healthy life in less then 100 worlds please?';
-      const bboxid = '12345';
-
-      // setup new session for this chat id
-      beebee.startNewChatSession(bboxid);
-
-
-      // Listen for the 'response' event
-      const responsePromise = new Promise((resolve) => {
-        const handler = (response, receivedBboxID) => {
-          if (receivedBboxID === bboxid) {
-            beebee.off('response', handler);
-            resolve({ response, receivedBboxID });
-          }
-        };
-        beebee.on('response', handler);
-      });
-
-      const response = await beebee.prompt(prompt, {}, bboxid);
-      const { response: eventResponse, receivedBboxID } = await responsePromise;
-
+    it('should return a reply for a given prompt', async () => {
+      const prompt = 'How to live a healthy life?';
+      const response = await beebee.emulate(prompt);
+      console.log('Response:')
+      console.log(response)
       expect(response).toBeDefined();
       expect(response).toBeTypeOf('string');
       expect(response.length).toBeGreaterThan(0);
-      expect(eventResponse).toBe(response);
-      expect(receivedBboxID).toBe(bboxid);
-
-      // Ensure the response has two parts
-      const parts = response.split('\n');
-      expect(parts.length).toBeGreaterThanOrEqual(2);
-    }, 300000); // Increase timeout to 300 seconds
+    }, 300000);
   });
 
-describe('Streaming Reply Functionality', () => {
-    it('should return a streaming reply for a given prompt and bboxid', async () => {
-      const prompt = 'How to life a healthy life in less then 100 worlds please?';
-      const bboxid = '67890';
-
+  describe('Streaming Reply Functionality', () => {
+    it('should return a streaming reply for a given prompt', async () => {
+      const prompt = 'Healthy life tips?';
       let fullResponse = '';
-      const tokensWithBboxID = [];
 
-      const onToken = (token, tokenBboxID) => {
+      for await (const token of beebee.stream(prompt)) {
         fullResponse += token;
-        tokensWithBboxID.push({ token, bboxid: tokenBboxID });
-      };
-
-      // Listen for the 'token' event
-      const tokenEvents = [];
-      beebee.on('token', (token, receivedBboxID) => {
-        console.log('toekn out')
-        console.log(token)
-        tokenEvents.push({ token, receivedBboxID });
-      });
-
-      // Listen for the 'response' event
-      const responsePromise = new Promise((resolve) => {
-        const handler = (response, receivedBboxID) => {
-          if (receivedBboxID === bboxid) {
-            beebee.off('response', handler);
-            resolve({ response, receivedBboxID });
-          }
-        };
-        beebee.on('response', handler);
-      });
-
-      // setup new session for this chat id
-      beebee.startNewChatSession(bboxid);
-
-      const response = await beebee.promptStream(prompt, {}, onToken, bboxid);
-      console.log(response);
-      const { response: eventResponse, receivedBboxID } = await responsePromise;
-
-      expect(response).toBeDefined();
-      expect(response).toBeTypeOf('string');
-      expect(response.length).toBeGreaterThan(0);
-      expect(fullResponse).toBe(response);
-      expect(eventResponse).toBe(response);
-      expect(receivedBboxID).toBe(bboxid);
-
-      // Ensure the response has two parts
-      const parts = response.split('\n');
-      expect(parts.length).toBeGreaterThanOrEqual(2);
-
-      // Validate that each token event has the correct bboxid
-      tokenEvents.forEach(({ token, receivedBboxID }) => {
-        expect(receivedBboxID).toBe(bboxid);
-      });
-
-      // Validate that each token in the tokensWithBboxID array has the correct bboxid
-      tokensWithBboxID.forEach(({ token, bboxid: tokenBboxID }) => {
-        expect(tokenBboxID).toBe(bboxid);
-      });
-    }, 300000); // Increase timeout to 300 seconds
+      }
+      console.log('Full response:')
+      console.log(fullResponse)
+      expect(fullResponse.length).toBeGreaterThan(0);
+    }, 300000);
   });
 });

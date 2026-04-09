@@ -1,356 +1,76 @@
-import { EventEmitter } from "events";
-import { getLlama, LlamaChatSession, LlamaChat } from "node-llama-cpp";
-import { fileURLToPath } from "url";
-import { dirname, join } from "path";
-import { ModelManager } from "./model-manager.js";
-import { BeeBeeConfig } from "./config.js";
+import { pipeline } from '@huggingface/transformers';
+// Note: Transformers.js handles ONNX Runtime internally. 
+// We don't usually need to create a separate 'session' manually 
+// unless we are doing custom low-level tensor work.
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
+/**
+ * Setup and Prompt Gemma 4
+ */
+async function runGemmaLongevity() {
+    console.log("Checking environment and initializing Gemma 4...");
 
-export class BeeBee extends EventEmitter {
-  constructor(config = {}) {
-    super();
-    // Handle both BeeBeeConfig instances and plain objects
-    if (config instanceof BeeBeeConfig) {
-      this.config = config.get();
-    } else if (config.get && typeof config.get === 'function') {
-      this.config = config.get();
-    } else {
-      // Create a BeeBeeConfig instance with the provided config
-      const beebeeConfig = new BeeBeeConfig(config);
-      this.config = beebeeConfig.get();
-    }
-    
-    this.llama = null;
-    this.model = null;
-    this.chatContext = {},
-    this.context = null;
-    this.session = {};
-    this.isInitialized = false;
-    
-    // Initialize model manager
-    this.modelManager = new ModelManager(this.config.modelPath);
-    // Set up event listeners for model management
-    this.setupModelEventListeners();
-  }
-  
-  /**
-  * 
-  * @method setupModelEventListeners
-  *
-  */
-  setupModelEventListeners() {
-    // Listen for model check request from BentoBoxDS
-    this.on('model:check', () => {
-      const modelInfo = this.modelManager.getModelInfo();
-      if (modelInfo.exists) {
-        this.emit('model:exists', modelInfo);
-      } else {
-        this.emit('model:missing', modelInfo);
-      }
-    });
-    
-    // Listen for download start from BentoBoxDS
-    this.on('model:download:start', async (data) => {
-      const source = data?.source || 'hyperdrive';
-      const downloadInfo = this.modelManager.getDownloadInfo(source);
-      
-      // Ensure directory exists
-      await this.modelManager.ensureDirectory();
-      
-      // Emit ready for download
-      this.emit('model:download:ready', downloadInfo);
-    });
-    
-    // Listen for download complete from BentoBoxDS
-    this.on('model:download:complete', async () => {
-      // Re-check model and try to initialize if it exists now
-      if (this.modelManager.exists()) {
-        try {
-          await this.initialize();
-        } catch (error) {
-          this.emit('error', { 
-            type: 'initialization', 
-            message: error.message 
-          });
-        }
-      }
-    });
-  }
-
-  /**
-  * 
-  * @method initialize
-  *
-  */
-  async initialize() {
-    if (this.isInitialized) return true;
-    try {
-      // Check if model file exists
-      if (!this.modelManager.exists()) {
-        const modelInfo = this.modelManager.getModelInfo();
-        this.emit('model:missing', modelInfo);
-        // Don't emit error here, just return false to indicate not initialized
-        return false;
-      }
-      // Get llama instance
-      this.llama = await getLlama();
-      // Load the model
-      this.model = await this.llama.loadModel({
-        modelPath: this.config.modelPath,
-        ...this.config.modelOptions
-      });
-      // Create context
-      this.context = await this.model.createContext({
-        contextSize: this.config.contextSize,
-        threads: this.config.threads,
-        sequences: 4
-      });
-      this.isInitialized = true;
-      // Emit ready event
-      this.emit('ready');
-      return true;
-    } catch (error) {
-      console.error("Failed to initialize BeeBee:", error);
-      // Emit error event
-      this.emit('error', error);
-      throw error;
-    }
-  }
-
-  /**
-  * 
-  * @method startNewChatSession
-  *
-  */
-  startNewChatSession(chatID, systemPrompt) {
-    // Create chat session
-    this.chatContext[chatID] = this.context.getSequence()
-    this.session[chatID] = new LlamaChatSession({
-      contextSequence: this.chatContext[chatID],
-      systemPrompt: systemPrompt || this.config.systemPrompt || undefined
-    });
-  }
-
-  /**
-  * 
-  * @method createGrammar
-  * @param {Object} schema - JSON schema object
-  * @returns {Promise<Object>} - LlamaGrammar instance
-  */
-  async createGrammar(schema) {
-    if (!this.llama) {
-      throw new Error("BeeBee not initialized. Call initialize() first.");
-    }
-    return await this.llama.createGrammarForJsonSchema(schema);
-  }
-
-  /**
-  * 
-  * @method getLlama
-  * @returns {Object} - Llama instance
-  */
-  getLlama() {
-    return this.llama;
-  }
-
-  /**
-  * 
-  * @method prompt
-  *
-  */
-  async prompt(text, options = {}, bboxID) {
-    // is this first prompt of this chat session?
-    if (!this.isInitialized) {
-      throw new Error("BeeBee not initialized. Call initialize() first.");
-    }
-
-    const sessionID = bboxID || 'default';
-    if (!this.session[sessionID]) {
-      this.startNewChatSession(sessionID);
-    }
-
-    const fullPrompt = this.buildPrompt(text, options, bboxID);
-    try {
-      const response = await this.session[sessionID].prompt(fullPrompt, {
-        temperature: options.temperature || this.config.temperature,
-        topP: options.topP || this.config.topP,
-        maxTokens: options.maxTokens || this.config.maxTokens,
-        grammar: options.grammar
-      });
-      
-      // Emit response event
-      this.emit('response', response, bboxID);
-      
-      return response;
-    } catch (error) {
-      console.error("Error generating response:", error);
-      // Emit error event
-      this.emit('error', error);
-      throw error;
-    }
-  }
-
-  /**
-  * 
-  * @method promptStream
-  *
-  */
-  async promptStream(text, options = {}, onToken, bboxID) {
-    if (!this.isInitialized) {
-      throw new Error("BeeBee not initialized. Call initialize() first.");
-    }
-
-    const sessionID = bboxID || 'default';
-    if (!this.session[sessionID]) {
-      this.startNewChatSession(sessionID);
-    }
-
-    const fullPrompt = this.buildPrompt(text, options, bboxID);
-
-    try {
-      let fullResponse = "";
-      
-      // Use prompt with onToken callback for streaming
-      const response = await this.session[sessionID].prompt(fullPrompt, {
-        temperature: options.temperature || this.config.temperature,
-        topP: options.topP || this.config.topP,
-        maxTokens: options.maxTokens || this.config.maxTokens,
-        grammar: options.grammar,
-        onToken: (tokens) => {
-          // tokens can be an array of token IDs (numbers) or strings
-          const tokenArray = Array.isArray(tokens) ? tokens : [tokens];
-          
-          for (const token of tokenArray) {
-            // Convert token to string if it's a number (token ID)
-            const tokenStr = typeof token === 'number' ? 
-              this.model.detokenize([token]) : 
-              String(token);
-            
-            fullResponse += tokenStr;
-            
-            // Emit token event
-            this.emit('token', tokenStr, bboxID);
-            
-            if (onToken) {
-              onToken(tokenStr, bboxID);
+    // 1. Initialize the pipeline
+    // In Node.js, we don't have navigator.gpu. 
+    // We set device to 'cpu' for maximum inclusion/stability on laptops.
+    const generator = await pipeline('text-generation', 'onnx-community/gemma-4-E2B-it-ONNX', {
+        dtype: 'q4',
+        device: 'cpu', // Forced to CPU to avoid those CUDA/Shared Library errors
+        progress_callback: (info) => {
+            if (info.status === 'progress') {
+                console.log(`[Loading] ${info.file}: ${info.progress.toFixed(1)}%`);
             }
-          }
+            if (info.status === 'ready') {
+                console.log("✅ Gemma 4 is cached and ready.");
+            }
         }
-      });
-      
-      // Emit complete response event
-      this.emit('response', fullResponse, bboxID);
-      
-      return fullResponse;
-    } catch (error) {
-      console.error("Error generating streaming response:", error);
-      // Emit error event
-      this.emit('error', error);
-      throw error;
-    }
-  }
+    });
 
-  /**
-  * 
-  * @method buildPrompt
-  *
-  */
-  buildPrompt(text, options, bboxID) {
-    let prompt = '';
+    /**
+     * Internal prompting function
+     */
+    async function promptGemma(userQuestion, enableThinking = true) {
+        const messages = [
+            { 
+                role: "system", 
+                content: enableThinking 
+                    ? "You are a helpful assistant. <|think|>" 
+                    : "You are a helpful assistant." 
+            },
+            { role: "user", content: userQuestion }
+        ];
 
-    if (bboxID) {
-      prompt += `[Context: bboxid=${bboxID}]\n`;
-    }
+        console.log("\n--- Thinking... ---\n");
 
-    prompt += text;
-    return prompt;
-  }
+        const output = await generator(messages, {
+            max_new_tokens: 1024, // Increased for longevity answers
+            temperature: 0.7,
+            do_sample: true,
+            top_p: 0.95,
+            // return_full_text: false makes it easier to extract just the answer
+            return_full_text: false, 
+        });
 
-  /**
-  * 
-  * @method complete
-  *
-  */
-  async complete(prompt, options = {}) {
-    if (!this.context) {
-      throw new Error("BeeBee not initialized. Call initialize() first.");
+        // Transformers.js v4 returns the full conversation array or the new text
+        // Depending on the version, we extract the content string:
+        const response = output[0].generated_text;
+        
+        // If it's the full array, get the last content; if string, return string.
+        return typeof response === 'string' 
+            ? response 
+            : response[response.length - 1].content;
     }
 
-    const completionOptions = {
-      temperature: options.temperature || this.config.temperature,
-      topP: options.topP || this.config.topP,
-      maxTokens: options.maxTokens || this.config.maxTokens,
-      ...options
-    };
-
+    // 2. Execute the prompt
     try {
-      const sequence = this.context.getSequence();
-      
-      // Tokenize the prompt
-      const tokens = this.model.tokenize(prompt);
-      
-      // Insert tokens into sequence
-      sequence.insertTokens(tokens);
-      
-      // Generate completion
-      const completionTokens = await sequence.evaluate({
-        temperature: completionOptions.temperature,
-        topP: completionOptions.topP,
-        maxTokens: completionOptions.maxTokens
-      });
-      
-      // Decode tokens to text
-      const completion = this.model.detokenize(completionTokens);
-      
-      return completion;
-    } catch (error) {
-      console.error("Error generating completion:", error);
-      throw error;
+        const question = "How to live for longevity? Provide 3 actionable pillars.";
+        const answer = await promptGemma(question);
+        
+        console.log("\n--- Gemma's Wisdom ---\n");
+        console.log(answer);
+    } catch (err) {
+        console.error("Error during generation:", err);
     }
-  }
-
-  /**
-  * 
-  * @method dispose
-  *
-  */
-  async dispose() {
-    if (this.context && typeof this.context.dispose === 'function') {
-      await this.context.dispose();
-    }
-    if (this.model && typeof this.model.dispose === 'function') {
-      await this.model.dispose();
-    }
-    this.isInitialized = false;
-  }
-
-  // Utility method to get model info
-  /**
-  * 
-  * @method 
-  *
-  */
-  getModelInfo() {
-    if (!this.model) {
-      return null;
-    }
-    
-    return {
-      modelPath: this.config.modelPath,
-      contextSize: this.config.contextSize,
-      threads: this.config.threads
-    };
-  }
 }
 
-// Export a factory function for convenience
-export async function createBeeBee(config = {}) {
-  const beebee = new BeeBee(config);
-  // Wait for initialization to complete
-  await beebee.initialize();
-  // Return beebee instance even if model is missing
-  // BentoBoxDS can handle the model:missing event
-  return beebee;
-}
+// Start the process
+runGemmaLongevity();
